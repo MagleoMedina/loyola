@@ -15,9 +15,8 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Locale;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 public class ExcelService {
@@ -196,6 +195,118 @@ public class ExcelService {
         }
 
         return result;
+    }
+
+    public String generateStudentParagraph(Path filePath, String studentName) throws IOException {
+        try (InputStream is = new FileInputStream(filePath.toFile());
+             Workbook workbook = new XSSFWorkbook(is)) {
+
+            Sheet sheet = workbook.getSheetAt(0);
+
+            // ponytail: hardcoded areas and column ranges based on Excel layout
+            Map<String, List<Integer>> areas = Map.of(
+                    "LENGUAJE Y COMUNICACIÓN", range(2, 18),
+                    "MATEMÁTICA", range(19, 26),
+                    "CIENCIAS NATURALES", range(27, 31),
+                    "CIENCIAS SOCIALES", range(32, 37),
+                    "ESTÉTICA", range(38, 40),
+                    "IOV", range(51, 53)
+            );
+
+            Map<String, List<String>> indicators = new LinkedHashMap<>();
+            Row headerRow = sheet.getRow(7);
+            Row indicatorRow = sheet.getRow(8);
+
+            for (var entry : areas.entrySet()) {
+                List<String> inds = new ArrayList<>();
+                for (int col : entry.getValue()) {
+                    Cell c = indicatorRow.getCell(col);
+                    if (c != null) {
+                        c.setCellType(CellType.STRING);
+                        String v = c.getStringCellValue();
+                        if (v != null && !v.trim().isEmpty()) inds.add(v.trim());
+                    }
+                }
+                indicators.put(entry.getKey(), inds);
+            }
+
+            // Find first student row dynamically
+            Row studentRow = null;
+            for (Row r : sheet) {
+                Cell n = r.getCell(0);
+                if (n == null) continue;
+                n.setCellType(CellType.STRING);
+                String v = n.getStringCellValue();
+                if (v != null && v.trim().equalsIgnoreCase(studentName.trim())) {
+                    studentRow = r;
+                    break;
+                }
+            }
+            if (studentRow == null) throw new RuntimeException("Student not found: " + studentName);
+
+            // Build data map for AI
+            Map<String, Map<String, String>> studentData = new LinkedHashMap<>();
+            for (var entry : areas.entrySet()) {
+                Map<String, String> indGrades = new LinkedHashMap<>();
+                List<Integer> cols = entry.getValue();
+                List<String> inds = indicators.get(entry.getKey());
+                for (int j = 0; j < cols.size() && j < inds.size(); j++) {
+                    Cell g = studentRow.getCell(cols.get(j));
+                    String grade = "";
+                    if (g != null) {
+                        g.setCellType(CellType.STRING);
+                        String v = g.getStringCellValue();
+                        if (v != null) grade = v.trim();
+                    }
+                    indGrades.put(inds.get(j), grade);
+                }
+                studentData.put(entry.getKey(), indGrades);
+            }
+
+            // Build prompt for AI
+            StringBuilder prompt = new StringBuilder();
+            prompt.append("Genera un informe pedagógico de un párrafo para el estudiante ")
+                    .append(studentName).append(". ")
+                    .append("Utiliza los siguientes datos de rendimiento por área e indicador:\n\n");
+
+            for (var area : studentData.entrySet()) {
+                prompt.append("Área: ").append(area.getKey()).append("\n");
+                for (var ind : area.getValue().entrySet()) {
+                    prompt.append("  - ").append(ind.getKey())
+                            .append(" → ").append(formatGrade(ind.getValue())).append("\n");
+                }
+                prompt.append("\n");
+            }
+
+            prompt.append("""
+                    El informe debe seguir esta estructura:
+                    1. Comenzar con "Su rendimiento fue [excelente/muy satisfactorio/satisfactorio/poco satisfactorio] según su literal."
+                    2. Mencionar logros específicos en Lenguaje y Comunicación citando indicadores donde obtuvo LT.
+                    3. Mencionar logros en Matemática citando indicadores donde obtuvo LT.
+                    4. Mencionar las demás áreas donde su rendimiento fue bueno.
+                    5. Si hay áreas con LP o EP, mencionar recomendaciones breves.
+                    6. Terminar con una frase motivacional entre comillas.
+                    Usar tono profesional, primera persona del plural.
+                    """);
+
+            return new IAconfig().generateParagraph(prompt.toString());
+        }
+    }
+
+    private String formatGrade(String grade) {
+        return switch (grade) {
+            case "LT" -> "logrado totalmente";
+            case "LP" -> "logrado parcialmente";
+            case "EP" -> "en proceso";
+            case "I" -> "insuficiente";
+            default -> grade;
+        };
+    }
+
+    private List<Integer> range(int from, int to) {
+        List<Integer> r = new ArrayList<>();
+        for (int i = from; i <= to; i++) r.add(i);
+        return r;
     }
 
     private String capitalize(String s) {

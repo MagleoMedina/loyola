@@ -11,7 +11,7 @@ public class OpenAI {
 
     private static final Logger log = LoggerFactory.getLogger(OpenAI.class);
     private static final String BASE_URL = "https://integrate.api.nvidia.com/v1";
-    private static final String API_KEY = "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";
+    private static final String API_KEY = "";
     private static final String MODEL = "deepseek-ai/deepseek-v4-pro";
 
     private final OpenAIClient client;

@@ -7,6 +7,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.nio.file.Path;
@@ -69,6 +70,16 @@ public class ExcelController {
         try {
             String result = new IAconfig().test();
             return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Error: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/student-report")
+    public ResponseEntity<?> studentReport(@RequestParam(defaultValue = "ALVAREZ AMARANTE RAFAEL IGNACIO") String name) {
+        try {
+            String report = excelService.generateStudentParagraph(Path.of("../notas.xlsx"), name);
+            return ResponseEntity.ok(report);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("Error: " + e.getMessage());
         }

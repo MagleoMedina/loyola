@@ -25,6 +25,17 @@ public class IAconfig {
         return openAI.sendMessage(systemPrompt + "\n\n" + userMessage);
     }
 
+    public String generateParagraph(String prompt) {
+        String systemPrompt = """
+                Eres un docente de nivel primario que redacta informes \
+                pedagógicos detallados. Usas un tono profesional, positivo y alentador. \
+                Redactas en primera persona del plural. \
+                Cada informe es un solo párrafo cohesivo que cubre todas las áreas. \
+                Terminas con una frase motivacional entre comillas.
+                """;
+        return openAI.sendMessage(systemPrompt + "\n\n" + prompt);
+    }
+
     public String test() {
         return openAI.sendMessage("cuanto es 2 + 2");
     }
