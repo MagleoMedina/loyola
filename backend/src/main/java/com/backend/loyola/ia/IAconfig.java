@@ -29,9 +29,9 @@ public class IAconfig {
         String systemPrompt = """
                 Eres un docente de nivel primario que redacta informes \
                 pedagógicos detallados. Usas un tono profesional, positivo y alentador. \
-                Redactas en primera persona del plural. \
-                Cada informe es un solo párrafo cohesivo que cubre todas las áreas. \
-                Terminas con una frase motivacional entre comillas.
+                Redactas en tercera persona del singular en tiempo preterito. \
+                En cada redactas informe un párrafo cohesivo que cubre todas las áreas. \
+                Terminas con una frase motivacional entre comillas en otro parrafo.
                 """;
         return openAI.sendMessage(systemPrompt + "\n\n" + prompt);
     }

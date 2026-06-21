@@ -6,12 +6,11 @@ import com.backend.loyola.services.ExcelService;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 public class ExcelController {
@@ -76,12 +75,32 @@ public class ExcelController {
     }
 
     @GetMapping("/student-report")
-    public ResponseEntity<?> studentReport(@RequestParam(defaultValue = "ALVAREZ AMARANTE RAFAEL IGNACIO") String name) {
+    public ResponseEntity<?> studentReport(@RequestParam(defaultValue = "GONZALEZ CASTRO FABIAN MATHÍAS") String name) {
         try {
             String report = excelService.generateStudentParagraph(Path.of("../notas.xlsx"), name);
             return ResponseEntity.ok(report);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("Error: " + e.getMessage());
+        }
+    }
+
+    @PostMapping("/student-report")
+    public ResponseEntity<?> studentReportPost(@RequestBody Map<String, String> body) {
+        try {
+            String name = body.get("name");
+            if (name == null || name.isBlank())
+                return ResponseEntity.badRequest().body(Map.of("error", "name is required"));
+
+            Path filePath = Path.of("../notas.xlsx");
+            String momento = excelService.getMomento(filePath);
+            String report = excelService.generateStudentParagraph(filePath, name);
+
+            return ResponseEntity.ok(Map.of(
+                    "name", name,
+                    "report", report
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
 }

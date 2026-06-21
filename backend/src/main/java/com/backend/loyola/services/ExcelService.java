@@ -118,9 +118,9 @@ public class ExcelService {
 
     public byte[] generateDocx(Path filePath) throws IOException {
         List<String> names = parseNames(filePath);
+        List<String> rawNames = parseRawNames(filePath);
         String momento = getMomento(filePath);
         List<String> literals = getLiterals(filePath);
-        IAconfig ia = new IAconfig();
 
         try (XWPFDocument doc = new XWPFDocument();
              ByteArrayOutputStream out = new ByteArrayOutputStream()) {
@@ -134,15 +134,45 @@ public class ExcelService {
                 XWPFParagraph p1 = doc.createParagraph();
                 p1.createRun().setText(names.get(i) + " durante el " + momento + ",");
 
-                String literal = i < literals.size() ? literals.get(i) : "";
-                String feedback = ia.generateFeedback(names.get(i), momento, literal);
+                String rawName = i < rawNames.size() ? rawNames.get(i) : "";
+                String paragraph = generateStudentParagraph(filePath, rawName);
                 XWPFParagraph p2 = doc.createParagraph();
-                p2.createRun().setText(feedback);
+                p2.createRun().setText(paragraph);
             }
 
             doc.write(out);
             return out.toByteArray();
         }
+    }
+
+    public List<String> parseRawNames(Path filePath) throws IOException {
+        List<String> result = new ArrayList<>();
+        try (InputStream is = new FileInputStream(filePath.toFile());
+             Workbook workbook = new XSSFWorkbook(is)) {
+            Sheet sheet = workbook.getSheetAt(0);
+            int startRow = -1;
+            for (Row row : sheet) {
+                for (Cell cell : row) {
+                    if (cell.getCellType() == CellType.STRING
+                            && "APELLIDO Y NOMBRE".equals(cell.getStringCellValue().trim().toUpperCase())) {
+                        startRow = cell.getRowIndex() + 1;
+                        break;
+                    }
+                }
+                if (startRow != -1) break;
+            }
+            for (int i = startRow; i <= sheet.getLastRowNum(); i++) {
+                Row row = sheet.getRow(i);
+                if (row == null) continue;
+                Cell cell = row.getCell(0);
+                if (cell == null) continue;
+                cell.setCellType(CellType.STRING);
+                String raw = cell.getStringCellValue();
+                if (raw == null || raw.trim().isEmpty()) continue;
+                result.add(raw.trim());
+            }
+        }
+        return result;
     }
 
     public List<String> getLiterals(Path filePath) throws IOException {
@@ -281,11 +311,13 @@ public class ExcelService {
             prompt.append("""
                     El informe debe seguir esta estructura:
                     1. Comenzar con "Su rendimiento fue [excelente/muy satisfactorio/satisfactorio/poco satisfactorio] según su literal."
-                    2. Mencionar logros específicos en Lenguaje y Comunicación citando indicadores donde obtuvo LT.
-                    3. Mencionar logros en Matemática citando indicadores donde obtuvo LT.
+                    2. Mencionar logros específicos en Lenguaje y Comunicación citando textualmente 2 indicadores donde obtuvo LT.
+                    3. Mencionar logros en Matemática citando textualmente 2 indicadores donde obtuvo LT.
                     4. Mencionar las demás áreas donde su rendimiento fue bueno.
-                    5. Si hay áreas con LP o EP, mencionar recomendaciones breves.
+                    5. Si hay áreas con LP o EP, mencionar recomendaciones breves y citar los indicadores en los que tuvo problemas.
                     6. Terminar con una frase motivacional entre comillas.
+                    7. No menciones los indicadores como LP, LT, EP sino el texto del indicador.
+                    8. A los indicadores que cites, la primera palabra que corresponde a un verbo debe de ir en preterito dando coherencia con la palabra anterior. 
                     Usar tono profesional, primera persona del plural.
                     """);
 
