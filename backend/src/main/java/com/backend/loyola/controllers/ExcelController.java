@@ -1,5 +1,6 @@
 package com.backend.loyola.controllers;
 
+import com.backend.loyola.ia.IAconfig;
 import com.backend.loyola.services.ExcelService;
 
 import org.springframework.http.HttpHeaders;
@@ -58,6 +59,16 @@ public class ExcelController {
                     .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=notas.docx")
                     .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.wordprocessingml.document"))
                     .body(data);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Error: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/ia-test")
+    public ResponseEntity<?> iaTest() {
+        try {
+            String result = new IAconfig().test();
+            return ResponseEntity.ok(result);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body("Error: " + e.getMessage());
         }

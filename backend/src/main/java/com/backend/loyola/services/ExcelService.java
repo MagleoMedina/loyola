@@ -6,7 +6,9 @@ import org.springframework.stereotype.Service;
 
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.apache.poi.xwpf.usermodel.XWPFParagraph;
-import org.apache.poi.xwpf.usermodel.XWPFRun;
+
+
+import com.backend.loyola.ia.IAconfig;
 
 import java.io.ByteArrayOutputStream;
 import java.io.FileInputStream;
@@ -119,6 +121,7 @@ public class ExcelService {
         List<String> names = parseNames(filePath);
         String momento = getMomento(filePath);
         List<String> literals = getLiterals(filePath);
+        IAconfig ia = new IAconfig();
 
         try (XWPFDocument doc = new XWPFDocument();
              ByteArrayOutputStream out = new ByteArrayOutputStream()) {
@@ -133,8 +136,9 @@ public class ExcelService {
                 p1.createRun().setText(names.get(i) + " durante el " + momento + ",");
 
                 String literal = i < literals.size() ? literals.get(i) : "";
+                String feedback = ia.generateFeedback(names.get(i), momento, literal);
                 XWPFParagraph p2 = doc.createParagraph();
-                p2.createRun().setText("Su rendimiento fue " + literal+ ".");
+                p2.createRun().setText(feedback);
             }
 
             doc.write(out);
