@@ -274,6 +274,41 @@ public class ExcelService {
             }
             if (studentRow == null) throw new RuntimeException("Student not found: " + studentName);
 
+            // Find literal column and get student's literal
+            int literalCol = -1;
+            int dataStartRow = -1;
+            for (Row r : sheet) {
+                for (Cell c : r) {
+                    if (c.getCellType() == CellType.STRING
+                            && "APELLIDO Y NOMBRE".equals(c.getStringCellValue().trim().toUpperCase())) {
+                        dataStartRow = c.getRowIndex();
+                    }
+                    if (c.getCellType() == CellType.STRING
+                            && "LITERAL".equals(c.getStringCellValue().trim().toUpperCase())) {
+                        literalCol = c.getColumnIndex();
+                        dataStartRow = Math.max(dataStartRow, c.getRowIndex());
+                    }
+                }
+                if (dataStartRow != -1 && literalCol != -1) break;
+            }
+            String literalTexto = "";
+            if (literalCol != -1) {
+                Cell lc = studentRow.getCell(literalCol);
+                if (lc != null) {
+                    lc.setCellType(CellType.STRING);
+                    String raw = lc.getStringCellValue();
+                    if (raw != null) {
+                        literalTexto = switch (raw.trim().toUpperCase()) {
+                            case "A" -> "excelente";
+                            case "B" -> "muy satisfactorio";
+                            case "C" -> "satisfactorio";
+                            case "D" -> "poco satisfactorio";
+                            default -> raw.trim();
+                        };
+                    }
+                }
+            }
+
             // Build data map for AI
             Map<String, Map<String, String>> studentData = new LinkedHashMap<>();
             for (var entry : areas.entrySet()) {
@@ -310,7 +345,7 @@ public class ExcelService {
 
             prompt.append("""
                     El informe debe seguir esta estructura:
-                    1. Comenzar con "Su rendimiento fue [excelente/muy satisfactorio/satisfactorio/poco satisfactorio] según su literal."
+                    1. Comenzar con "Su rendimiento fue """ + literalTexto + "\".\n" + """
                     2. Mencionar logros específicos en Lenguaje y Comunicación citando textualmente 2 indicadores donde obtuvo LT.
                     3. Mencionar logros en Matemática citando textualmente 2 indicadores donde obtuvo LT.
                     4. Mencionar las demás áreas donde su rendimiento fue bueno.
@@ -318,6 +353,7 @@ public class ExcelService {
                     6. Terminar con una frase motivacional entre comillas.
                     7. No menciones los indicadores como LP, LT, EP sino el texto del indicador.
                     8. A los indicadores que cites, la primera palabra que corresponde a un verbo debe de ir en preterito dando coherencia con la palabra anterior. 
+                    9. No uses negritas para remarcar palabras **.
                     Usar tono profesional, primera persona del plural.
                     """);
 
