@@ -454,6 +454,7 @@ public class ExcelService {
                     8. A los indicadores que cites, la primera palabra que corresponde a un verbo debe de ir en preterito dando coherencia con la palabra anterior. 
                     9. No uses negritas para remarcar palabras **.
                     Usar tono profesional, primera persona del plural.
+                    10. Los indicadores que con LT o LP a la hora de mencionarlos se deben escoger de manera aleatoria, no siempre los mismos.
                     """);
 
             return new IAconfig().generateParagraph(prompt.toString());
