@@ -41,10 +41,10 @@ function GradeBadge({ grade }) {
     I: 'grade-i',
   }[grade] || 'grade-default'
   const label = {
-    LT: 'Logrado Totalmente',
-    LP: 'Logrado Parcialmente',
-    EP: 'En Proceso',
-    I: 'Insuficiente',
+    LT: 'LT',
+    LP: 'LP',
+    EP: 'EP',
+    I: 'I',
   }[grade] || grade
   return <span className={`badge ${cls}`}>{label}</span>
 }
@@ -60,8 +60,8 @@ function AreaCard({ area }) {
       <h3 className="area-title">{area.name}</h3>
       <div className="indicators">
         {area.indicators.map((ind, i) => (
-          <div key={i} className="indicator-row">
-            <span className="ind-name">{ind.name}</span>
+            <div key={i} className="indicator-row" style={{ display: 'flex', alignItems: '-moz-initial', gap: '8px', justifyContent: 'stretch' }}>
+              <span className="ind-name">{ind.name}</span>
             <GradeBadge grade={ind.grade} />
           </div>
         ))}

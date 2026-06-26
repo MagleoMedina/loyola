@@ -19,6 +19,7 @@ import java.util.*;
 
 
 @Service
+@SuppressWarnings("deprecation")
 public class ExcelService {
 
     public List<String> parseNames(Path filePath) throws IOException {
@@ -120,7 +121,6 @@ public class ExcelService {
         List<String> names = parseNames(filePath);
         List<String> rawNames = parseRawNames(filePath);
         String momento = getMomento(filePath);
-        List<String> literals = getLiterals(filePath);
 
         try (XWPFDocument doc = new XWPFDocument();
              ByteArrayOutputStream out = new ByteArrayOutputStream()) {
@@ -148,7 +148,7 @@ public class ExcelService {
     public List<String> parseRawNames(Path filePath) throws IOException {
         List<String> result = new ArrayList<>();
         try (InputStream is = new FileInputStream(filePath.toFile());
-             Workbook workbook = new XSSFWorkbook(is)) {
+            Workbook workbook = new XSSFWorkbook(is)) {
             Sheet sheet = workbook.getSheetAt(0);
             int startRow = -1;
             for (Row row : sheet) {
@@ -161,6 +161,7 @@ public class ExcelService {
                 }
                 if (startRow != -1) break;
             }
+            
             for (int i = startRow; i <= sheet.getLastRowNum(); i++) {
                 Row row = sheet.getRow(i);
                 if (row == null) continue;
