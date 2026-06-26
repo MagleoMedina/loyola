@@ -16,7 +16,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Path;
 import java.util.*;
-import java.util.stream.Collectors;
+
 
 @Service
 public class ExcelService {
@@ -227,25 +227,123 @@ public class ExcelService {
         return result;
     }
 
+    public Map<String, Object> getStudentData(Path filePath, String studentName) throws IOException {
+        try (InputStream is = new FileInputStream(filePath.toFile());
+             Workbook workbook = new XSSFWorkbook(is)) {
+
+            Sheet sheet = workbook.getSheetAt(0);
+
+            Map<String, List<Integer>> areas = detectAreas(sheet);
+
+            Row indicatorRow = sheet.getRow(7);
+            Map<String, List<String>> indicators = new LinkedHashMap<>();
+            for (var entry : areas.entrySet()) {
+                List<String> inds = new ArrayList<>();
+                for (int col : entry.getValue()) {
+                    Cell c = indicatorRow.getCell(col);
+                    if (c != null) {
+                        c.setCellType(CellType.STRING);
+                        String v = c.getStringCellValue();
+                        if (v != null && !v.trim().isEmpty()) inds.add(v.trim());
+                    }
+                }
+                indicators.put(entry.getKey(), inds);
+            }
+
+            Row studentRow = null;
+            for (Row r : sheet) {
+                Cell n = r.getCell(0);
+                if (n == null) continue;
+                n.setCellType(CellType.STRING);
+                String v = n.getStringCellValue();
+                if (v != null && v.trim().equalsIgnoreCase(studentName.trim())) {
+                    studentRow = r;
+                    break;
+                }
+            }
+            if (studentRow == null) throw new RuntimeException("Student not found: " + studentName);
+
+            // Find literal
+            int literalCol = -1;
+            int dataStartRow = -1;
+            for (Row r : sheet) {
+                for (Cell c : r) {
+                    if (c.getCellType() == CellType.STRING
+                            && "APELLIDO Y NOMBRE".equals(c.getStringCellValue().trim().toUpperCase())) {
+                        dataStartRow = c.getRowIndex();
+                    }
+                    if (c.getCellType() == CellType.STRING
+                            && "LITERAL".equals(c.getStringCellValue().trim().toUpperCase())) {
+                        literalCol = c.getColumnIndex();
+                        dataStartRow = Math.max(dataStartRow, c.getRowIndex());
+                    }
+                }
+                if (dataStartRow != -1 && literalCol != -1) break;
+            }
+            String literal = "";
+            if (literalCol != -1) {
+                Cell lc = studentRow.getCell(literalCol);
+                if (lc != null) {
+                    lc.setCellType(CellType.STRING);
+                    String raw = lc.getStringCellValue();
+                    if (raw != null) {
+                        literal = switch (raw.trim().toUpperCase()) {
+                            case "A" -> "excelente";
+                            case "B" -> "muy satisfactorio";
+                            case "C" -> "satisfactorio";
+                            case "D" -> "poco satisfactorio";
+                            default -> raw.trim();
+                        };
+                    }
+                }
+            }
+
+            String momento = getMomento(filePath);
+
+            List<Map<String, Object>> areasData = new ArrayList<>();
+            for (var entry : areas.entrySet()) {
+                List<Map<String, String>> indsData = new ArrayList<>();
+                List<Integer> cols = entry.getValue();
+                List<String> inds = indicators.get(entry.getKey());
+                for (int j = 0; j < cols.size() && j < inds.size(); j++) {
+                    Cell g = studentRow.getCell(cols.get(j));
+                    String grade = "";
+                    if (g != null) {
+                        g.setCellType(CellType.STRING);
+                        String v = g.getStringCellValue();
+                        if (v != null) grade = v.trim();
+                    }
+                    Map<String, String> ind = new LinkedHashMap<>();
+                    ind.put("name", inds.get(j));
+                    ind.put("grade", grade);
+                    ind.put("label", formatGrade(grade));
+                    indsData.add(ind);
+                }
+                Map<String, Object> area = new LinkedHashMap<>();
+                area.put("name", entry.getKey());
+                area.put("indicators", indsData);
+                areasData.add(area);
+            }
+
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("name", studentName);
+            result.put("literal", literal);
+            result.put("momento", momento);
+            result.put("areas", areasData);
+            return result;
+        }
+    }
+
     public String generateStudentParagraph(Path filePath, String studentName) throws IOException {
         try (InputStream is = new FileInputStream(filePath.toFile());
              Workbook workbook = new XSSFWorkbook(is)) {
 
             Sheet sheet = workbook.getSheetAt(0);
 
-            // ponytail: hardcoded areas and column ranges based on Excel layout
-            Map<String, List<Integer>> areas = Map.of(
-                    "LENGUAJE Y COMUNICACIÓN", range(2, 18),
-                    "MATEMÁTICA", range(19, 26),
-                    "CIENCIAS NATURALES", range(27, 31),
-                    "CIENCIAS SOCIALES", range(32, 37),
-                    "ESTÉTICA", range(38, 40),
-                    "IOV", range(51, 53)
-            );
+            Map<String, List<Integer>> areas = detectAreas(sheet);
 
             Map<String, List<String>> indicators = new LinkedHashMap<>();
-            Row headerRow = sheet.getRow(7);
-            Row indicatorRow = sheet.getRow(8);
+            Row indicatorRow = sheet.getRow(7);
 
             for (var entry : areas.entrySet()) {
                 List<String> inds = new ArrayList<>();
@@ -380,5 +478,49 @@ public class ExcelService {
     private String capitalize(String s) {
         if (s == null || s.isEmpty()) return s;
         return Character.toUpperCase(s.charAt(0)) + s.substring(1).toLowerCase(Locale.ROOT);
+    }
+
+    private Map<String, List<Integer>> detectAreas(Sheet sheet) {
+        Row row6 = sheet.getRow(6);
+        if (row6 == null) throw new RuntimeException("Row 6 (areas) not found");
+
+        Set<String> targets = Set.of(
+                "LENGUAJE Y COMUNICACIÓN", "MATEMÁTICA",
+                "CIENCIAS NATURALES", "CIENCIAS SOCIALES",
+                "ESTÉTICA", "IOV"
+        );
+
+        // Collect all area names and their columns from row 6 (in order)
+        List<String> allNames = new ArrayList<>();
+        Map<String, Integer> colOf = new LinkedHashMap<>();
+        for (Cell c : row6) {
+            if (c == null) continue;
+            c.setCellType(CellType.STRING);
+            String v = c.getStringCellValue();
+            if (v == null || v.trim().isEmpty()) continue;
+            String name = v.trim().toUpperCase();
+            if ("APELLIDO Y NOMBRE".equals(name) || "TOTAL".equals(name)) continue;
+            allNames.add(v.trim());
+            colOf.put(v.trim(), c.getColumnIndex());
+        }
+
+        Map<String, List<Integer>> result = new LinkedHashMap<>();
+        for (int i = 0; i < allNames.size(); i++) {
+            String name = allNames.get(i);
+
+            // Find the canonical name (case-insensitive)
+            String canonical = null;
+            for (String t : targets) {
+                if (t.equalsIgnoreCase(name)) { canonical = t; break; }
+            }
+            if (canonical == null) continue;
+
+            int start = colOf.get(name);
+            int end = (i + 1 < allNames.size())
+                    ? colOf.get(allNames.get(i + 1)) - 1
+                    : 72;
+            result.put(canonical, range(start, end));
+        }
+        return result;
     }
 }

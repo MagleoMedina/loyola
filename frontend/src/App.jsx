@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import './App.css'
 
@@ -33,12 +33,91 @@ function CopyButton({ text }) {
   )
 }
 
+function GradeBadge({ grade }) {
+  const cls = {
+    LT: 'grade-lt',
+    LP: 'grade-lp',
+    EP: 'grade-ep',
+    I: 'grade-i',
+  }[grade] || 'grade-default'
+  const label = {
+    LT: 'Logrado Totalmente',
+    LP: 'Logrado Parcialmente',
+    EP: 'En Proceso',
+    I: 'Insuficiente',
+  }[grade] || grade
+  return <span className={`badge ${cls}`}>{label}</span>
+}
+
+function AreaCard({ area }) {
+  return (
+    <motion.div
+      className="area-card"
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
+    >
+      <h3 className="area-title">{area.name}</h3>
+      <div className="indicators">
+        {area.indicators.map((ind, i) => (
+          <div key={i} className="indicator-row">
+            <span className="ind-name">{ind.name}</span>
+            <GradeBadge grade={ind.grade} />
+          </div>
+        ))}
+      </div>
+    </motion.div>
+  )
+}
+
+function Dashboard({ rawName }) {
+  const [data, setData] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    if (!rawName) return
+    setLoading(true)
+    setData(null)
+    setError(null)
+    fetch(`/student-data?name=${encodeURIComponent(rawName)}`)
+      .then(r => r.ok ? r.json() : r.text().then(t => { throw new Error(t) }))
+      .then(setData)
+      .catch(e => setError(e.message))
+      .finally(() => setLoading(false))
+  }, [rawName])
+
+  if (loading) return <div className="dashboard-loading"><span className="spinner" /> Cargando notas...</div>
+  if (error) return <div className="dashboard-error">Error: {error}</div>
+  if (!data) return null
+
+  return (
+    <motion.div
+      className="dashboard"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+    >
+      <div className="dashboard-header">
+        <h2 style = {{ color: '#333' }}>{data.name}</h2>
+        <span className="literal-badge">{data.literal}</span>
+        <span className="momento">{data.momento}</span>
+      </div>
+      <div className="areas-grid">
+        {data.areas.map((area, i) => (
+          <AreaCard key={i} area={area} />
+        ))}
+      </div>
+    </motion.div>
+  )
+}
+
 function App() {
   const [students, setStudents] = useState([])
   const [selectedRaw, setSelectedRaw] = useState('')
   const [report, setReport] = useState('')
   const [loading, setLoading] = useState(false)
   const [reportLoading, setReportLoading] = useState(false)
+  const [showDashboard, setShowDashboard] = useState(false)
 
   const handleUpload = async (e) => {
     const file = e.target.files[0]
@@ -47,6 +126,7 @@ function App() {
     setStudents([])
     setSelectedRaw('')
     setReport('')
+    setShowDashboard(false)
     const fd = new FormData()
     fd.append('file', file)
     try {
@@ -58,6 +138,14 @@ function App() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleSelect = (e) => {
+    const idx = e.target.value
+    if (!idx) { setSelectedRaw(''); setShowDashboard(false); return }
+    setSelectedRaw(students[idx].raw)
+    setShowDashboard(false)
+    setReport('')
   }
 
   const handleGenerate = async () => {
@@ -79,6 +167,10 @@ function App() {
       setReportLoading(false)
     }
   }
+
+  const selectedFormatted = selectedRaw
+    ? students.find(s => s.raw === selectedRaw)?.formatted
+    : ''
 
   return (
     <div className="app">
@@ -127,29 +219,40 @@ function App() {
             exit={{ opacity: 0, y: 20 }}
             transition={{ delay: 0.2 }}
           >
-            <select value={selectedRaw ? students.findIndex(s => s.raw === selectedRaw) : ''} onChange={(e) => {
-              const idx = e.target.value
-              if (!idx) { setSelectedRaw(''); return }
-              setSelectedRaw(students[idx].raw)
-            }}>
+            <select value={selectedRaw ? students.findIndex(s => s.raw === selectedRaw) : ''} onChange={handleSelect}>
               <option value="">— Seleccionar estudiante —</option>
               {students.map((s, i) => (
                 <option key={i} value={i}>{s.formatted}</option>
               ))}
             </select>
-            <motion.button
-              className="generate-btn"
-              onClick={handleGenerate}
-              disabled={!selectedRaw || reportLoading}
-              whileHover={selectedRaw && !reportLoading ? { scale: 1.05 } : {}}
-              whileTap={selectedRaw && !reportLoading ? { scale: 0.95 } : {}}
-            >
-              {reportLoading ? (
-                <><span className="spinner small" /> Generando...</>
-              ) : 'Generar Reporte'}
-            </motion.button>
+            <div className="select-actions">
+              <motion.button
+                className="generate-btn"
+                onClick={() => setShowDashboard(true)}
+                disabled={!selectedRaw}
+                whileHover={selectedRaw ? { scale: 1.05 } : {}}
+                whileTap={selectedRaw ? { scale: 0.95 } : {}}
+              >
+                Ver Notas
+              </motion.button>
+              <motion.button
+                className="generate-btn primary"
+                onClick={handleGenerate}
+                disabled={!selectedRaw || reportLoading}
+                whileHover={selectedRaw && !reportLoading ? { scale: 1.05 } : {}}
+                whileTap={selectedRaw && !reportLoading ? { scale: 0.95 } : {}}
+              >
+                {reportLoading ? (
+                  <><span className="spinner small" /> Generando...</>
+                ) : 'Generar Reporte'}
+              </motion.button>
+            </div>
           </motion.section>
         )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {selectedRaw && showDashboard && <Dashboard rawName={selectedRaw} key={selectedRaw} />}
       </AnimatePresence>
 
       <AnimatePresence>

@@ -10,6 +10,7 @@ export default defineConfig({
       '/upload': { target: API, changeOrigin: true },
       '/parse-names': { target: API, changeOrigin: true },
       '/student-report': { target: API, changeOrigin: true },
+      '/student-data': { target: API, changeOrigin: true },
       '/momento': { target: API, changeOrigin: true },
       '/literals': { target: API, changeOrigin: true },
       '/generate-docx': { target: API, changeOrigin: true },

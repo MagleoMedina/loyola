@@ -106,6 +106,15 @@ public class ExcelController {
         }
     }
 
+    @GetMapping("/student-data")
+    public ResponseEntity<?> studentData(@RequestParam String name) {
+        try {
+            return ResponseEntity.ok(excelService.getStudentData(getFilePath(), name));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
     @GetMapping("/student-report")
     public ResponseEntity<?> studentReport(@RequestParam(defaultValue = "GONZALEZ CASTRO FABIAN MATHÍAS") String name) {
         try {
